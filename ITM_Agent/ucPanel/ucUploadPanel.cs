@@ -81,7 +81,7 @@ namespace ITM_Agent.ucPanel
             {
                 string folder = cbPath.Text.Trim();
                 string plugin = cbPlugin.Text.Trim();
-    
+
                 if (string.IsNullOrEmpty(folder) || string.IsNullOrEmpty(plugin))
                 {
                     MessageBox.Show("폴더와 플러그인을 모두 선택해야 합니다.", "알림", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -92,19 +92,18 @@ namespace ITM_Agent.ucPanel
                     MessageBox.Show("선택한 폴더가 존재하지 않습니다.", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return;
                 }
-    
+
                 string value = $"Folder={folder}, Plugin={plugin}";
                 _settingsManager.SetValue(SECTION, key, value);
-    
-                // UI 컨트롤의 값을 스레드 안전한 멤버 변수에 저장
+
                 string watcherName = GetWatcherName(key);
                 _watcherSettings[watcherName] = (folder, plugin);
-    
+
                 _logger.Event($"[{key}] setting saved: {value}");
                 MessageBox.Show($"[{key}] 설정이 저장되었습니다.", "저장 완료", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 StartWatchingByKey(key);
             };
-    
+
             btnClear.Click += (s, e) =>
             {
                 cbPath.SelectedIndex = -1;
@@ -112,14 +111,13 @@ namespace ITM_Agent.ucPanel
                 cbPlugin.SelectedIndex = -1;
                 cbPlugin.Text = "";
                 _settingsManager.SetValue(SECTION, key, null);
-    
-                // 멤버 변수에서도 설정 제거
+
                 string watcherName = GetWatcherName(key);
                 if (_watcherSettings.ContainsKey(watcherName))
                 {
                     _watcherSettings.Remove(watcherName);
                 }
-    
+
                 _logger.Event($"[{key}] setting cleared.");
                 _fileProcessingService.StopWatcher(watcherName);
             };
@@ -227,7 +225,7 @@ namespace ITM_Agent.ucPanel
         {
             string pluginName = GetPluginNameByWatcher(watcherName);
             if (string.IsNullOrEmpty(pluginName)) return;
-    
+
             _logger.Event($"[UploadPanel] Stable file detected by '{watcherName}': {filePath}");
             string finalPath = _overridePanel.EnsureOverrideAndReturnPath(filePath);
             var pluginInfo = _pluginPanel.GetLoadedPlugins().FirstOrDefault(p => p.PluginName.Equals(pluginName, StringComparison.OrdinalIgnoreCase));
@@ -236,7 +234,7 @@ namespace ITM_Agent.ucPanel
                 _logger.Error($"[UploadPanel] Plugin '{pluginName}' is not loaded or not found.");
                 return;
             }
-    
+
             Task.Run(() =>
             {
                 try
@@ -250,12 +248,11 @@ namespace ITM_Agent.ucPanel
                         _logger.Error($"[UploadPanel] Plugin '{pluginInfo.PluginName}' does not implement IPlugin interface.");
                         return;
                     }
-    
-                    // 플러그인 인스턴스 생성 및 의존성 주입
+
                     IPlugin instance = (IPlugin)Activator.CreateInstance(targetType);
-                    var dbRepository = new DatabaseRepository(_logger); // 실제로는 MainForm에서 단일 인스턴스를 받아와 전달하는 것이 더 좋음
+                    var dbRepository = new DatabaseRepository(_logger);
                     instance.Initialize(_logger, dbRepository);
-    
+
                     string eqpid = _settingsManager.GetEqpid();
                     instance.ProcessAndUpload(finalPath, null, eqpid);
                     _logger.Event($"[UploadPanel] Plugin '{pluginInfo.PluginName}' execution completed for file: {finalPath}");
@@ -266,7 +263,7 @@ namespace ITM_Agent.ucPanel
                 }
             });
         }
-        
+
         public void SetControlsEnabled(bool isEnabled)
         {
             groupBox1.Enabled = isEnabled;
@@ -291,10 +288,9 @@ namespace ITM_Agent.ucPanel
         }
 
         private string GetWatcherName(string key) => $"Upload_{key}";
-        
+
         private string GetPluginNameByWatcher(string watcherName)
         {
-            // UI 컨트롤 대신 스레드 안전한 멤버 변수에서 값을 조회
             if (_watcherSettings.TryGetValue(watcherName, out var settings))
             {
                 return settings.plugin;
