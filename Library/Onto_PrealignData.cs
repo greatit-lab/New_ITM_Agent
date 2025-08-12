@@ -22,14 +22,15 @@ namespace Onto_PrealignDataLib
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         }
     }
-    
+
     // 자체 인터페이스 대신 IPlugin을 구현합니다.
     public class Onto_PrealignData : IPlugin
     {
-        private readonly ILogger _logger;
-        private readonly DatabaseRepository _dbRepository;
+        // 'readonly' 키워드를 제거하여 Initialize 메서드에서 할당이 가능하도록 수정
+        private ILogger _logger;
+        private DatabaseRepository _dbRepository;
         private FileSystemWatcher _fw; // 기능 유지를 위해 남겨둠
-        
+
         public string PluginName => "Onto_PrealignData";
 
         static Onto_PrealignData()
@@ -37,23 +38,21 @@ namespace Onto_PrealignDataLib
             EncodingProvider.Register();
         }
 
-        // 생성자는 비워둡니다.
-        public Onto_PrealignData() { }
-    
-        // 외부에서 로거와 DB 저장소를 주입받습니다.
+        // 비어있는 기본 생성자만 남겨둡니다.
+        public Onto_PrealignData()
+        {
+        }
+
+        /// <summary>
+        /// IPlugin 인터페이스를 통해 외부에서 로거와 DB 리포지토리를 주입받습니다.
+        /// </summary>
         public void Initialize(ILogger logger, DatabaseRepository dbRepository)
         {
+            // 이 메서드에서 필드 값을 할당합니다.
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _dbRepository = dbRepository ?? throw new ArgumentNullException(nameof(dbRepository));
         }
 
-        public Onto_PrealignData()
-        {
-            // 중앙 서비스 인스턴스를 가져옵니다.
-            _logger = SharedLogManager.Instance;
-            _dbRepository = new DatabaseRepository(_logger);
-        }
-        
         // IPlugin 인터페이스의 필수 구현 멤버입니다. (수동 처리용)
         public void ProcessAndUpload(string filePath, object arg1 = null, object arg2 = null)
         {
@@ -66,7 +65,7 @@ namespace Onto_PrealignDataLib
 
             // 메인 프로그램으로부터 EQPID를 전달받습니다.
             string eqpid = arg2 as string ?? "UNKNOWN_EQPID";
-            
+
             try
             {
                 ProcessCore(filePath, eqpid); // 전체 파일을 처리하는 메서드 호출
@@ -111,7 +110,7 @@ namespace Onto_PrealignDataLib
             {
                 Match m = rex.Match(line);
                 if (!m.Success) continue;
-                
+
                 if (DateTime.TryParse(m.Groups[4].Value.Trim(), out DateTime ts) &&
                     decimal.TryParse(m.Groups[1].Value, out decimal x) &&
                     decimal.TryParse(m.Groups[2].Value, out decimal y) &&
@@ -137,7 +136,7 @@ namespace Onto_PrealignDataLib
                     INSERT INTO public.plg_prealign (eqpid, datetime, xmm, ymm, notch, serv_ts)
                     VALUES (@eqpid, @datetime, @xmm, @ymm, @notch, @serv_ts)
                     ON CONFLICT (eqpid, datetime) DO NOTHING;";
-                    
+
                 foreach (DataRow row in dataTable.Rows)
                 {
                     var parameters = dataTable.Columns.Cast<DataColumn>()
