@@ -1,5 +1,5 @@
 using ITM_Agent.Common;
-using ITM_Agent.Core.Plugins; // IPlugin 인터페이스를 사용하기 위해 추가
+using ITM_Agent.Core.Plugins;
 using Npgsql;
 using System;
 using System.Collections.Generic;
@@ -13,8 +13,6 @@ using System.Threading;
 
 namespace Onto_WaferFlatDataLib
 {
-    // .NET Core/5+ 환경에서 CP949 인코딩을 사용하기 위해 필요합니다.
-    // 이 프로젝트에 System.Text.Encoding.CodePages NuGet 패키지를 설치해야 합니다.
     static class EncodingProvider
     {
         public static void Register()
@@ -23,10 +21,8 @@ namespace Onto_WaferFlatDataLib
         }
     }
 
-    // 자체 인터페이스 대신 IPlugin을 구현합니다.
     public class Onto_WaferFlatData : IPlugin
     {
-        // 'readonly' 키워드를 제거하여 Initialize 메서드에서 할당이 가능하도록 수정
         private ILogger _logger;
         private DatabaseRepository _dbRepository;
 
@@ -37,17 +33,12 @@ namespace Onto_WaferFlatDataLib
             EncodingProvider.Register();
         }
 
-        // 비어있는 기본 생성자만 남겨둡니다.
         public Onto_WaferFlatData()
         {
         }
-        
-        /// <summary>
-        /// IPlugin 인터페이스를 통해 외부에서 로거와 DB 리포지토리를 주입받습니다.
-        /// </summary>
+
         public void Initialize(ILogger logger, DatabaseRepository dbRepository)
         {
-            // 이 메서드에서 필드 값을 할당합니다.
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _dbRepository = dbRepository ?? throw new ArgumentNullException(nameof(dbRepository));
         }
@@ -64,7 +55,6 @@ namespace Onto_WaferFlatDataLib
 
             try
             {
-                // arg2를 통해 메인 프로그램으로부터 EQPID를 전달받습니다.
                 string eqpid = arg2 as string ?? "UNKNOWN_EQPID";
                 ProcessFile(filePath, eqpid);
             }
@@ -88,7 +78,7 @@ namespace Onto_WaferFlatDataLib
                 if (idx > 0)
                 {
                     string key = ln.Substring(0, idx).Trim();
-                    if (!meta.ContainsKey(key)) // .NET Framework 호환
+                    if (!meta.ContainsKey(key))
                     {
                         meta.Add(key, ln.Substring(idx + 1).Trim());
                     }
@@ -125,14 +115,14 @@ namespace Onto_WaferFlatDataLib
                 UploadData(dataTable, Path.GetFileName(filePath));
             }
 
-            try 
-            { 
+            try
+            {
                 File.Delete(filePath);
                 _logger.Debug($"[WaferFlat] Source file deleted: {filePath}");
-            } 
-            catch (Exception ex) 
-            { 
-                _logger.Error($"[WaferFlat] Failed to delete file {filePath}: {ex.Message}"); 
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"[WaferFlat] Failed to delete file {filePath}: {ex.Message}");
             }
         }
 
@@ -168,16 +158,16 @@ namespace Onto_WaferFlatDataLib
                 row["datetime"] = dtVal != DateTime.MinValue ? (object)dtVal : DBNull.Value;
                 row["film"] = meta.GetValueOrDefault("Film Name", "");
                 row["eqpid"] = eqpid;
-                
+
                 if (dtVal != DateTime.MinValue) row["serv_ts"] = TimeSyncProvider.Instance.ToSynchronizedKst(dtVal);
                 else row["serv_ts"] = DBNull.Value;
-                
+
                 foreach (var kvp in headerIndexMap)
                 {
                     string colName = kvp.Key;
                     int colIdx = kvp.Value;
                     string rawVal = (colIdx < vals.Length) ? vals[colIdx] : "";
-                    
+
                     if (double.TryParse(rawVal, out double numVal)) row[colName] = numVal;
                     else row[colName] = string.IsNullOrEmpty(rawVal) ? (object)DBNull.Value : rawVal;
                 }
@@ -196,11 +186,11 @@ namespace Onto_WaferFlatDataLib
                     var cols = string.Join(", ", dataTable.Columns.Cast<DataColumn>().Select(c => $"\"{c.ColumnName}\""));
                     var pars = string.Join(", ", dataTable.Columns.Cast<DataColumn>().Select(c => $"@{c.ColumnName}"));
                     string sql = string.Format(sqlTemplate, cols, pars);
-                    
+
                     var sqlParams = dataTable.Columns.Cast<DataColumn>()
                         .Select(c => new NpgsqlParameter($"@{c.ColumnName}", row[c] ?? DBNull.Value))
                         .ToArray();
-                        
+
                     _dbRepository.ExecuteNonQuery(sql, sqlParams);
                 }
                 _logger.Event($"[WaferFlat] Successfully uploaded {dataTable.Rows.Count} rows from {sourceFileName}.");
@@ -210,7 +200,7 @@ namespace Onto_WaferFlatDataLib
                 _logger.Error($"[WaferFlat] Database upload failed for {sourceFileName}: {ex.Message}");
             }
         }
-        
+
         private string NormalizeHeader(string h)
         {
             h = h.ToLowerInvariant();
