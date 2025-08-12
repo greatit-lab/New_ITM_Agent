@@ -39,6 +39,16 @@ namespace Onto_ErrorDataLib
             _dbRepository = new DatabaseRepository(_logger);
         }
 
+        // 생성자는 비워둡니다.
+        public Onto_ErrorData() { }
+        
+        // 외부에서 로거와 DB 저장소를 주입받습니다.
+        public void Initialize(ILogger logger, DatabaseRepository dbRepository)
+        {
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _dbRepository = dbRepository ?? throw new ArgumentNullException(nameof(dbRepository));
+        }
+
         public void ProcessAndUpload(string filePath, object arg1 = null, object arg2 = null)
         {
             _logger.Event($"[ErrorData] ProcessAndUpload triggered for: {filePath}");
