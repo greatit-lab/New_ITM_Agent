@@ -49,7 +49,7 @@ namespace ITM_Agent
             _eqpidManager = new EqpidManager(_settingsManager, _logger, _dbRepository, AppVersion);
             _infoCleaner = new InfoRetentionCleaner(_settingsManager, _logger);
             bool isDebug = _settingsManager.GetValue("Option", "EnableDebugLog") == "1";
-            _pdfMergeManager = new PdfMergeManager(_logger);
+            _pdfMergeManager = new PdfMergeManager(_logger, isDebug);
 
             InitializeUserControls();
             InitializeTrayIcon();
