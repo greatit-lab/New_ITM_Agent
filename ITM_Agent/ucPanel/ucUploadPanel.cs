@@ -31,6 +31,9 @@ namespace ITM_Agent.ucPanel
         private const string WATCHER_EVENT = "Upload_Event";
         private const string WATCHER_WAVE = "Upload_Wave";
 
+        // 설정을 스레드로부터 안전하게 저장할 멤버 변수 추가
+        private readonly Dictionary<string, (string folder, string plugin)> _watcherSettings = new Dictionary<string, (string folder, string plugin)>();
+
         public ucUploadPanel(
             SettingsManager settingsManager,
             ILogger logger,
@@ -78,7 +81,7 @@ namespace ITM_Agent.ucPanel
             {
                 string folder = cbPath.Text.Trim();
                 string plugin = cbPlugin.Text.Trim();
-
+    
                 if (string.IsNullOrEmpty(folder) || string.IsNullOrEmpty(plugin))
                 {
                     MessageBox.Show("폴더와 플러그인을 모두 선택해야 합니다.", "알림", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -89,14 +92,19 @@ namespace ITM_Agent.ucPanel
                     MessageBox.Show("선택한 폴더가 존재하지 않습니다.", "오류", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return;
                 }
-
+    
                 string value = $"Folder={folder}, Plugin={plugin}";
                 _settingsManager.SetValue(SECTION, key, value);
+    
+                // UI 컨트롤의 값을 스레드 안전한 멤버 변수에 저장
+                string watcherName = GetWatcherName(key);
+                _watcherSettings[watcherName] = (folder, plugin);
+    
                 _logger.Event($"[{key}] setting saved: {value}");
                 MessageBox.Show($"[{key}] 설정이 저장되었습니다.", "저장 완료", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 StartWatchingByKey(key);
             };
-
+    
             btnClear.Click += (s, e) =>
             {
                 cbPath.SelectedIndex = -1;
@@ -104,8 +112,16 @@ namespace ITM_Agent.ucPanel
                 cbPlugin.SelectedIndex = -1;
                 cbPlugin.Text = "";
                 _settingsManager.SetValue(SECTION, key, null);
+    
+                // 멤버 변수에서도 설정 제거
+                string watcherName = GetWatcherName(key);
+                if (_watcherSettings.ContainsKey(watcherName))
+                {
+                    _watcherSettings.Remove(watcherName);
+                }
+    
                 _logger.Event($"[{key}] setting cleared.");
-                _fileProcessingService.StopWatcher(GetWatcherName(key));
+                _fileProcessingService.StopWatcher(watcherName);
             };
         }
 
@@ -211,37 +227,42 @@ namespace ITM_Agent.ucPanel
         {
             string pluginName = GetPluginNameByWatcher(watcherName);
             if (string.IsNullOrEmpty(pluginName)) return;
-            
+    
             _logger.Event($"[UploadPanel] Stable file detected by '{watcherName}': {filePath}");
             string finalPath = _overridePanel.EnsureOverrideAndReturnPath(filePath);
-            var plugin = _pluginPanel.GetLoadedPlugins().FirstOrDefault(p => p.PluginName.Equals(pluginName, StringComparison.OrdinalIgnoreCase));
-            if (plugin == null)
+            var pluginInfo = _pluginPanel.GetLoadedPlugins().FirstOrDefault(p => p.PluginName.Equals(pluginName, StringComparison.OrdinalIgnoreCase));
+            if (pluginInfo == null)
             {
                 _logger.Error($"[UploadPanel] Plugin '{pluginName}' is not loaded or not found.");
                 return;
             }
-
+    
             Task.Run(() =>
             {
                 try
                 {
-                    _logger.Event($"[UploadPanel] Executing plugin '{plugin.PluginName}' for file: {finalPath}");
-                    byte[] dllBytes = File.ReadAllBytes(plugin.AssemblyPath);
+                    _logger.Event($"[UploadPanel] Executing plugin '{pluginInfo.PluginName}' for file: {finalPath}");
+                    byte[] dllBytes = File.ReadAllBytes(pluginInfo.AssemblyPath);
                     Assembly asm = Assembly.Load(dllBytes);
                     Type targetType = asm.GetTypes().FirstOrDefault(t => t.IsClass && !t.IsAbstract && typeof(IPlugin).IsAssignableFrom(t));
                     if (targetType == null)
                     {
-                        _logger.Error($"[UploadPanel] Plugin '{plugin.PluginName}' does not implement IPlugin interface.");
+                        _logger.Error($"[UploadPanel] Plugin '{pluginInfo.PluginName}' does not implement IPlugin interface.");
                         return;
                     }
+    
+                    // 플러그인 인스턴스 생성 및 의존성 주입
                     IPlugin instance = (IPlugin)Activator.CreateInstance(targetType);
+                    var dbRepository = new DatabaseRepository(_logger); // 실제로는 MainForm에서 단일 인스턴스를 받아와 전달하는 것이 더 좋음
+                    instance.Initialize(_logger, dbRepository);
+    
                     string eqpid = _settingsManager.GetEqpid();
                     instance.ProcessAndUpload(finalPath, null, eqpid);
-                    _logger.Event($"[UploadPanel] Plugin '{plugin.PluginName}' execution completed for file: {finalPath}");
+                    _logger.Event($"[UploadPanel] Plugin '{pluginInfo.PluginName}' execution completed for file: {finalPath}");
                 }
                 catch (Exception ex)
                 {
-                    _logger.Error($"[UploadPanel] Error executing plugin '{plugin.PluginName}' for file '{finalPath}': {ex.ToString()}");
+                    _logger.Error($"[UploadPanel] Error executing plugin '{pluginInfo.PluginName}' for file '{finalPath}': {ex.ToString()}");
                 }
             });
         }
@@ -273,16 +294,12 @@ namespace ITM_Agent.ucPanel
         
         private string GetPluginNameByWatcher(string watcherName)
         {
-            switch (watcherName)
+            // UI 컨트롤 대신 스레드 안전한 멤버 변수에서 값을 조회
+            if (_watcherSettings.TryGetValue(watcherName, out var settings))
             {
-                case WATCHER_WAFER_FLAT: return cb_FlatPlugin.Text;
-                case WATCHER_PRE_ALIGN: return cb_PreAlignPlugin.Text;
-                case WATCHER_ERROR: return cb_ErrPlugin.Text;
-                case WATCHER_IMAGE: return cb_ImagePlugin.Text;
-                case WATCHER_EVENT: return cb_EvPlugin.Text;
-                case WATCHER_WAVE: return cb_WavePlugin.Text;
-                default: return null;
+                return settings.plugin;
             }
+            return null;
         }
     }
 }
