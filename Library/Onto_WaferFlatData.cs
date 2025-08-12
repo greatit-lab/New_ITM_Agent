@@ -22,13 +22,14 @@ namespace Onto_WaferFlatDataLib
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         }
     }
-    
+
     // 자체 인터페이스 대신 IPlugin을 구현합니다.
     public class Onto_WaferFlatData : IPlugin
     {
-        private readonly ILogger _logger;
-        private readonly DatabaseRepository _dbRepository;
-        
+        // 'readonly' 키워드를 제거하여 Initialize 메서드에서 할당이 가능하도록 수정
+        private ILogger _logger;
+        private DatabaseRepository _dbRepository;
+
         public string PluginName => "Onto_WaferFlatData";
 
         static Onto_WaferFlatData()
@@ -36,23 +37,21 @@ namespace Onto_WaferFlatDataLib
             EncodingProvider.Register();
         }
 
-        / 생성자는 비워둡니다.
-        public Onto_WaferFlatData() { }
-    
-        // 외부에서 로거와 DB 저장소를 주입받습니다.
+        // 비어있는 기본 생성자만 남겨둡니다.
+        public Onto_WaferFlatData()
+        {
+        }
+        
+        /// <summary>
+        /// IPlugin 인터페이스를 통해 외부에서 로거와 DB 리포지토리를 주입받습니다.
+        /// </summary>
         public void Initialize(ILogger logger, DatabaseRepository dbRepository)
         {
+            // 이 메서드에서 필드 값을 할당합니다.
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _dbRepository = dbRepository ?? throw new ArgumentNullException(nameof(dbRepository));
         }
 
-        public Onto_WaferFlatData()
-        {
-            // 생성자에서 중앙 서비스 인스턴스를 가져옵니다.
-            _logger = SharedLogManager.Instance;
-            _dbRepository = new DatabaseRepository(_logger);
-        }
-        
         public void ProcessAndUpload(string filePath, object arg1 = null, object arg2 = null)
         {
             _logger.Event($"[WaferFlat] ProcessAndUpload triggered for: {filePath}");
@@ -264,3 +263,4 @@ namespace Onto_WaferFlatDataLib
         }
     }
 }
+```
