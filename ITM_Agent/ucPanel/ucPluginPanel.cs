@@ -148,24 +148,38 @@ namespace ITM_Agent.ucPanel
                 MessageBox.Show("삭제할 플러그인을 선택하세요.", "알림", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
-
+        
             string selectedText = lb_PluginList.SelectedItem.ToString();
             string pluginName = Regex.Match(selectedText, @"^\d+\.\s*([^(\s]+)").Groups[1].Value;
             var itemToRemove = _loadedPlugins.FirstOrDefault(p => p.PluginName.Equals(pluginName, StringComparison.OrdinalIgnoreCase));
             if (itemToRemove == null) return;
             
-            if (MessageBox.Show($"'{itemToRemove.PluginName}' 플러그인을 삭제하시겠습니까?", "삭제 확인", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
-
+            if (MessageBox.Show($"'{itemToRemove.PluginName}' 플러그인을 삭제하시겠습니까?\n(실제 파일은 프로그램 종료 후 삭제될 수 있습니다.)", "삭제 확인", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+        
             try
             {
+                // 설정 파일에서 즉시 제거
+                _settingsManager.SetValue(PLUGIN_SECTION, itemToRemove.PluginName, null);
+                _logger.Event($"Plugin '{itemToRemove.PluginName}' has been unregistered.");
+        
+                // UI와 로드된 플러그인 목록에서 제거
+                _loadedPlugins.Remove(itemToRemove);
+                UpdatePluginListDisplay();
+        
+                (this.FindForm() as MainForm)?.NotifyPluginsChanged();
+                
+                // DLL 파일 삭제 시도
                 if (File.Exists(itemToRemove.AssemblyPath))
                 {
                     File.Delete(itemToRemove.AssemblyPath);
+                    _logger.Event($"Plugin file '{itemToRemove.AssemblyPath}' deleted successfully.");
                 }
-                _settingsManager.SetValue(PLUGIN_SECTION, itemToRemove.PluginName, null);
-                _logger.Event($"Plugin removed: {itemToRemove.PluginName}");
-
-                (this.FindForm() as MainForm)?.NotifyPluginsChanged();
+            }
+            catch (IOException ioEx)
+            {
+                 // 파일이 사용 중이라 삭제에 실패한 경우
+                 _logger.Error($"Failed to delete plugin file '{itemToRemove.AssemblyPath}' because it is in use. It will be removed on next startup. Error: {ioEx.Message}");
+                 MessageBox.Show("플러그인이 현재 사용 중이어서 지금 파일을 삭제할 수 없습니다. 프로그램 재시작 시 반영됩니다.", "알림", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
