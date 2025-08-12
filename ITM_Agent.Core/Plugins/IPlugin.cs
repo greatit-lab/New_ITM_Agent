@@ -1,3 +1,5 @@
+// ITM_Agent.Core/Plugins/IPlugin.cs
+
 namespace ITM_Agent.Core.Plugins
 {
     /// <summary>
@@ -10,6 +12,13 @@ namespace ITM_Agent.Core.Plugins
         /// 플러그인의 고유한 이름을 반환합니다.
         /// </summary>
         string PluginName { get; }
+
+        /// <summary>
+        /// 플러그인 실행에 필요한 외부 종속성(로거, DB 저장소 등)을 주입합니다.
+        /// </summary>
+        /// <param name="logger">중앙 로거 인스턴스</param>
+        /// <param name="dbRepository">중앙 데이터베이스 리포지토리 인스턴스</param>
+        void Initialize(ILogger logger, DatabaseRepository dbRepository);
 
         /// <summary>
         /// 플러그인의 핵심 처리 로직을 실행하는 메서드입니다.
