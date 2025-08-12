@@ -1,5 +1,4 @@
 // ITM_Agent.Core/Plugins/IPlugin.cs
-
 namespace ITM_Agent.Core.Plugins
 {
     /// <summary>
