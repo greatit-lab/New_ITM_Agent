@@ -23,8 +23,8 @@ namespace Onto_ErrorDataLib
 
     public class Onto_ErrorData : IPlugin
     {
-        private readonly ILogger _logger;
-        private readonly DatabaseRepository _dbRepository;
+        private ILogger _logger;
+        private DatabaseRepository _dbRepository;
 
         public string PluginName => "Onto_ErrorData";
 
@@ -33,15 +33,6 @@ namespace Onto_ErrorDataLib
             EncodingProvider.Register();
         }
 
-        public Onto_ErrorData()
-        {
-            _logger = SharedLogManager.Instance;
-            _dbRepository = new DatabaseRepository(_logger);
-        }
-
-        // 생성자는 비워둡니다.
-        public Onto_ErrorData() { }
-        
         // 외부에서 로거와 DB 저장소를 주입받습니다.
         public void Initialize(ILogger logger, DatabaseRepository dbRepository)
         {
@@ -78,10 +69,10 @@ namespace Onto_ErrorDataLib
             if (!meta.ContainsKey("EqpId")) meta["EqpId"] = eqpid;
 
             UploadItmInfo(meta);
-            
+
             var errorTable = BuildErrorDataTable(lines, eqpid);
             var allowedErrorIds = LoadAllowedErrorIds();
-            
+
             var filteredTable = FilterErrorDataTable(errorTable, allowedErrorIds);
             _logger.Event($"[ErrorData] Filtering complete for {Path.GetFileName(filePath)}. Total: {errorTable.Rows.Count}, Filtered: {filteredTable.Rows.Count}");
 
@@ -106,7 +97,7 @@ namespace Onto_ErrorDataLib
                     }
                 }
             }
-            if (dict.TryGetValue("DATE", out string dateStr) && 
+            if (dict.TryGetValue("DATE", out string dateStr) &&
                 DateTime.TryParseExact(dateStr, "M/d/yyyy H:m:s", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime dt))
             {
                 dict["DATE"] = dt.ToString("yyyy-MM-dd HH:mm:ss");
@@ -127,15 +118,15 @@ namespace Onto_ErrorDataLib
             try
             {
                 DateTime date = meta.ContainsKey("DATE") && DateTime.TryParse(meta["DATE"], out var dt) ? dt : DateTime.Now;
-                
+
                 var parameters = new[] {
-                    new NpgsqlParameter("@eqpid", meta.GetValueOrDefault("EqpId", (object)DBNull.Value)),
-                    new NpgsqlParameter("@system_name", meta.GetValueOrDefault("SYSTEM_NAME", (object)DBNull.Value)),
-                    new NpgsqlParameter("@system_model", meta.GetValueOrDefault("SYSTEM_MODEL", (object)DBNull.Value)),
-                    new NpgsqlParameter("@serial_num", meta.GetValueOrDefault("SERIAL_NUM", (object)DBNull.Value)),
-                    new NpgsqlParameter("@application", meta.GetValueOrDefault("APPLICATION", (object)DBNull.Value)),
-                    new NpgsqlParameter("@version", meta.GetValueOrDefault("VERSION", (object)DBNull.Value)),
-                    new NpgsqlParameter("@db_version", meta.GetValueOrDefault("DB_VERSION", (object)DBNull.Value)),
+                    new NpgsqlParameter("@eqpid", (object)meta.GetValueOrDefault("EqpId") ?? DBNull.Value),
+                    new NpgsqlParameter("@system_name", (object)meta.GetValueOrDefault("SYSTEM_NAME") ?? DBNull.Value),
+                    new NpgsqlParameter("@system_model", (object)meta.GetValueOrDefault("SYSTEM_MODEL") ?? DBNull.Value),
+                    new NpgsqlParameter("@serial_num", (object)meta.GetValueOrDefault("SERIAL_NUM") ?? DBNull.Value),
+                    new NpgsqlParameter("@application", (object)meta.GetValueOrDefault("APPLICATION") ?? DBNull.Value),
+                    new NpgsqlParameter("@version", (object)meta.GetValueOrDefault("VERSION") ?? DBNull.Value),
+                    new NpgsqlParameter("@db_version", (object)meta.GetValueOrDefault("DB_VERSION") ?? DBNull.Value),
                     new NpgsqlParameter("@date", date),
                     new NpgsqlParameter("@serv_ts", TimeSyncProvider.Instance.ToSynchronizedKst(date))
                 };
@@ -147,7 +138,7 @@ namespace Onto_ErrorDataLib
                 _logger.Error($"[ErrorData] Failed to upsert itm_info: {ex.Message}");
             }
         }
-        
+
         private DataTable BuildErrorDataTable(string[] lines, string eqpid)
         {
             var dt = new DataTable();
@@ -165,14 +156,14 @@ namespace Onto_ErrorDataLib
             {
                 var m = rg.Match(ln);
                 if (!m.Success) continue;
-                
+
                 DateTime.TryParseExact(m.Groups["ts"].Value.Trim(), "dd-MMM-yy h:mm:ss tt", CultureInfo.InvariantCulture, DateTimeStyles.None, out var ts);
                 int.TryParse(m.Groups["ms"].Value, out var ms);
-                
+
                 var serv_ts = TimeSyncProvider.Instance.ToSynchronizedKst(ts);
                 serv_ts = new DateTime(serv_ts.Year, serv_ts.Month, serv_ts.Day, serv_ts.Hour, serv_ts.Minute, serv_ts.Second);
-                
-                dt.Rows.Add(eqpid, m.Groups["id"].Value.Trim(), ts, m.Groups["lbl"].Value.Trim(), m.Groups["desc"].Value.Trim(), 
+
+                dt.Rows.Add(eqpid, m.Groups["id"].Value.Trim(), ts, m.Groups["lbl"].Value.Trim(), m.Groups["desc"].Value.Trim(),
                             ms, m.Groups["extra"].Value.Trim(), "", serv_ts);
             }
             return dt;
@@ -240,7 +231,7 @@ namespace Onto_ErrorDataLib
                 _logger.Error($"[ErrorData] Failed to upload to plg_error table: {ex.Message}");
             }
         }
-        
+
         private bool WaitForFileReady(string path, int maxRetries, int delayMs)
         {
             for (int i = 0; i < maxRetries; i++)
@@ -254,7 +245,7 @@ namespace Onto_ErrorDataLib
             return false;
         }
     }
-    
+
     public static class DictionaryExtensions
     {
         public static TValue GetValueOrDefault<TKey, TValue>(this IDictionary<TKey, TValue> dictionary, TKey key, TValue defaultValue = default(TValue))
