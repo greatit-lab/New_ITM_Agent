@@ -36,6 +36,16 @@ namespace Onto_WaferFlatDataLib
             EncodingProvider.Register();
         }
 
+        / 생성자는 비워둡니다.
+        public Onto_WaferFlatData() { }
+    
+        // 외부에서 로거와 DB 저장소를 주입받습니다.
+        public void Initialize(ILogger logger, DatabaseRepository dbRepository)
+        {
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _dbRepository = dbRepository ?? throw new ArgumentNullException(nameof(dbRepository));
+        }
+
         public Onto_WaferFlatData()
         {
             // 생성자에서 중앙 서비스 인스턴스를 가져옵니다.
