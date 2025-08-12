@@ -288,7 +288,7 @@ namespace ITM_Agent
             // tsm_Plugin
             //
             this.tsm_Plugin.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
-              this.pluginList});
+              this.tsm_PluginList});
             this.tsm_Plugin.Name = "tsm_Plugin";
             this.tsm_Plugin.Size = new System.Drawing.Size(53, 20);
             this.tsm_Plugin.Text = "Plugin";
