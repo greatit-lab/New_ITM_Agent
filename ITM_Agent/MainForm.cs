@@ -5,7 +5,7 @@ using System;
 using System.Drawing;
 using System.IO;
 using System.Windows.Forms;
-using System.Collections.Generic; // List<T>를 사용하기 위해 추가
+using System.Collections.Generic;
 
 namespace ITM_Agent
 {
@@ -110,6 +110,7 @@ namespace ITM_Agent
         {
             _ucConfigPanel = new ucConfigurationPanel(_settingsManager, _logger);
             _ucPluginPanel = new ucPluginPanel(_settingsManager, _logger);
+            _ucPluginPanel.PluginsChanged += (sender, e) => NotifyPluginsChanged();
             _ucImageTransPanel = new ucImageTransPanel(_settingsManager, _logger, _fileProcessingService, _pdfMergeManager);
             _ucOverrideNamesPanel = new ucOverrideNamesPanel(_settingsManager, _logger, _fileProcessingService);
             _ucUploadPanel = new ucUploadPanel(_settingsManager, _logger, _fileProcessingService, _ucPluginPanel, _ucOverrideNamesPanel);
